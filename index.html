@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Suivi des factures</title>
+<meta name="theme-color" content="#E8812A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Factures">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<style>
+:root{--bg:#FFE9D3;--panel:#FFF6EC;--ink:#2F2B28;--gray:#6E6A67;--gray-l:#D9D4CF;--gray-bg:#EDEAE6;--or:#E8812A;--or-d:#B85E12;--red:#B3361E;--grn:#2E7D4F;color-scheme:light;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--gray);margin:0 0 18px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.tab{border:1px solid var(--gray-l);background:var(--gray-bg);color:var(--gray);padding:9px 14px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer}
+.tab[aria-selected=true]{background:var(--or);border-color:var(--or);color:#fff}
+.tab:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--or-d);outline-offset:2px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.card{background:var(--panel);border:1px solid var(--gray-l);border-radius:10px;padding:12px 14px}
+.card small{color:var(--gray);display:block;font-size:13px}
+.card b{font-size:19px;font-variant-numeric:tabular-nums}
+.card.key{background:var(--ink);border-color:var(--ink);color:#fff}
+.card.key small{color:#CFC9C4}
+.panel{background:var(--panel);border:1px solid var(--gray-l);border-radius:10px;padding:14px;margin-bottom:18px}
+.panel h2{font-size:16px;margin:0 0 10px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end}
+label{display:flex;flex-direction:column;font-size:13px;color:var(--gray);gap:3px}
+input{font:inherit;padding:8px 9px;border:1px solid var(--gray-l);border-radius:7px;background:#fff;color:var(--ink);width:100%}
+.btn{background:var(--or);color:#fff;border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer}
+.btn:hover{background:var(--or-d)}
+.ghost{background:var(--gray-bg);color:var(--ink);border:1px solid var(--gray-l);border-radius:7px;padding:6px 10px;font:inherit;cursor:pointer}
+.ghost:hover{background:var(--gray-l)}
+.scroll{overflow-x:auto;border-radius:10px;border:1px solid var(--gray-l);background:var(--panel)}
+table{border-collapse:collapse;width:100%;min-width:860px}
+th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--gray-l);font-variant-numeric:tabular-nums;white-space:nowrap}
+th{background:var(--gray-bg);color:var(--gray);font-size:13px;font-weight:600}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+td input{width:110px;text-align:right;padding:5px 7px}
+tfoot td{font-weight:700;background:var(--gray-bg);border-bottom:0}
+.red{color:var(--red);font-weight:600}.grn{color:var(--grn);font-weight:600}
+.empty{padding:22px;text-align:center;color:var(--gray)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.row input{max-width:260px;font-weight:600}
+.note{color:var(--gray);font-size:13px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Suivi des factures</h1>
+  <p class="sub">Quatre entreprises, un seul tableau de bord. Montants en dinars (DA).</p>
+  <div class="tabs" id="tabs" role="tablist"></div>
+  <div id="view"></div>
+</div>
+<script>
+(function(){
+var KEY="suivi-factures-v1";
+var data={companies:[
+ {name:"Entreprise 1",inv:[]},{name:"Entreprise 2",inv:[]},{name:"Entreprise 3",inv:[]},{name:"Entreprise 4",inv:[]}]};
+try{var s=localStorage.getItem(KEY);if(s){var p=JSON.parse(s);if(p&&p.companies&&p.companies.length===4)data=p;}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}}
+var cur=0;
+var fmt=new Intl.NumberFormat("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});
+function f(n){return fmt.format(n||0)}
+function calc(i){
+  var ttc=i.ht*(1+i.tva/100), ret=ttc*i.ret/100;
+  return {ttc:ttc,ret:ret,paye:i.paye,np:ttc-i.paye,reste:ttc-ret-i.paye};
+}
+function totals(list){
+  var t={ht:0,ttc:0,ret:0,paye:0,np:0,reste:0};
+  list.forEach(function(i){var c=calc(i);t.ht+=i.ht;t.ttc+=c.ttc;t.ret+=c.ret;t.paye+=c.paye;t.np+=c.np;t.reste+=c.reste;});
+  return t;
+}
+function cards(t){
+  return '<div class="cards">'+
+  '<div class="card"><small>Total HT</small><b>'+f(t.ht)+'</b></div>'+
+  '<div class="card"><small>Facturé TTC</small><b>'+f(t.ttc)+'</b></div>'+
+  '<div class="card"><small>Retenue de garantie</small><b>'+f(t.ret)+'</b></div>'+
+  '<div class="card"><small>Payé</small><b>'+f(t.paye)+'</b></div>'+
+  '<div class="card"><small>Non payé</small><b>'+f(t.np)+'</b></div>'+
+  '<div class="card key"><small>Reste à payer</small><b>'+f(t.reste)+'</b></div></div>';
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function drawTabs(){
+  var h="";
+  data.companies.forEach(function(c,k){h+='<button class="tab" role="tab" aria-selected="'+(cur===k)+'" data-t="'+k+'">'+esc(c.name)+'</button>';});
+  h+='<button class="tab" role="tab" aria-selected="'+(cur===4)+'" data-t="4">Vue globale</button>';
+  var el=document.getElementById("tabs");el.innerHTML=h;
+  el.querySelectorAll(".tab").forEach(function(b){b.onclick=function(){cur=+b.dataset.t;draw();};});
+}
+function drawGlobal(){
+  var all=[],rows="";
+  data.companies.forEach(function(c){
+    var t=totals(c.inv);all=all.concat(c.inv);
+    rows+='<tr><td>'+esc(c.name)+'</td><td>'+c.inv.length+'</td><td>'+f(t.ht)+'</td><td>'+f(t.ttc)+'</td><td>'+f(t.ret)+'</td><td>'+f(t.paye)+'</td><td class="red">'+f(t.np)+'</td><td><b>'+f(t.reste)+'</b></td></tr>';
+  });
+  document.getElementById("view").innerHTML=cards(totals(all))+
+  '<div class="scroll"><table><thead><tr><th>Entreprise</th><th>Factures</th><th>HT</th><th>Facturé TTC</th><th>Retenue</th><th>Payé</th><th>Non payé</th><th>Reste à payer</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function drawCompany(){
+  var c=data.companies[cur],t=totals(c.inv),rows="";
+  c.inv.forEach(function(i,k){
+    var x=calc(i);
+    rows+='<tr><td>'+esc(i.num)+'</td><td>'+esc(i.lib)+'</td><td>'+f(i.ht)+'</td><td>'+i.tva+' %</td><td>'+f(x.ttc)+'</td><td>'+f(x.ret)+' <span style="color:var(--gray)">('+i.ret+' %)</span></td>'+
+    '<td><input type="number" step="0.01" min="0" value="'+i.paye+'" data-p="'+k+'" aria-label="Montant payé"></td>'+
+    '<td class="'+(x.np>0.005?'red':'grn')+'">'+f(x.np)+'</td><td><b>'+f(x.reste)+'</b></td>'+
+    '<td><button class="ghost" data-d="'+k+'" aria-label="Supprimer la facture">Supprimer</button></td></tr>';
+  });
+  var body=c.inv.length?'<div class="scroll"><table><thead><tr><th>N° facture</th><th>Libellé</th><th>Montant HT</th><th>TVA</th><th>Montant TTC</th><th>Retenue de garantie</th><th>Payé</th><th>Non payé</th><th>Reste à payer</th><th></th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="2">Total</td><td>'+f(t.ht)+'</td><td></td><td>'+f(t.ttc)+'</td><td>'+f(t.ret)+'</td><td>'+f(t.paye)+'</td><td>'+f(t.np)+'</td><td>'+f(t.reste)+'</td><td></td></tr></tfoot></table></div>'
+   :'<div class="scroll"><div class="empty">Aucune facture. Ajoutez la première avec le formulaire ci-dessus.</div></div>';
+  document.getElementById("view").innerHTML=
+  '<div class="row"><input id="nm" value="'+esc(c.name)+'" aria-label="Nom de l’entreprise"><button class="ghost" id="rn">Renommer</button></div>'+
+  cards(t)+
+  '<div class="panel"><h2>Ajouter une facture</h2><div class="form">'+
+  '<label>N° facture<input id="fn" placeholder="F-001"></label>'+
+  '<label>Libellé<input id="fl" placeholder="Client ou chantier"></label>'+
+  '<label>Montant HT<input id="fh" type="number" step="0.01" min="0"></label>'+
+  '<label>TVA %<input id="ft" type="number" step="0.1" min="0" value="19"></label>'+
+  '<label>Retenue garantie %<input id="fr" type="number" step="0.1" min="0" value="0"></label>'+
+  '<label>Déjà payé<input id="fp" type="number" step="0.01" min="0" value="0"></label>'+
+  '<button class="btn" id="add">Ajouter</button></div></div>'+body+
+  '<p class="note">TTC = HT + TVA. Non payé = TTC − payé. Reste à payer = TTC − retenue de garantie − payé. Les données restent enregistrées dans ce navigateur.</p>';
+  document.getElementById("rn").onclick=function(){var v=document.getElementById("nm").value.trim();if(v){c.name=v;save();draw();}};
+  document.getElementById("add").onclick=function(){
+    var ht=parseFloat(document.getElementById("fh").value);
+    if(isNaN(ht)){document.getElementById("fh").focus();return;}
+    c.inv.push({num:document.getElementById("fn").value.trim()||"—",lib:document.getElementById("fl").value.trim(),ht:ht,
+      tva:parseFloat(document.getElementById("ft").value)||0,ret:parseFloat(document.getElementById("fr").value)||0,paye:parseFloat(document.getElementById("fp").value)||0});
+    save();draw();
+  };
+  document.querySelectorAll("[data-d]").forEach(function(b){b.onclick=function(){if(confirm("Supprimer cette facture ?")){c.inv.splice(+b.dataset.d,1);save();draw();}};});
+  document.querySelectorAll("[data-p]").forEach(function(inp){inp.onchange=function(){c.inv[+inp.dataset.p].paye=parseFloat(inp.value)||0;save();draw();};});
+}
+function draw(){drawTabs();if(cur===4)drawGlobal();else drawCompany();}
+draw();
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
+})();
+</script>
+</body>
+</html>

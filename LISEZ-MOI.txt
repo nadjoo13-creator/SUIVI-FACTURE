@@ -1,0 +1,19 @@
+INSTALLER L'APPLICATION "SUIVI DES FACTURES" SUR TELEPHONE
+
+Contenu : index.html, manifest.webmanifest, sw.js, dossier icons/
+Il faut mettre TOUS ces fichiers en ligne (HTTPS obligatoire).
+
+OPTION A - Netlify Drop (le plus simple, gratuit)
+1. Allez sur https://app.netlify.com/drop
+2. Glissez le dossier decompresse "suivi-factures-pwa" dans la page.
+3. Netlify vous donne un lien du type https://nom.netlify.app
+4. Ouvrez ce lien dans Chrome sur le telephone.
+5. Menu (3 points) > "Installer l'application".
+
+OPTION B - GitHub Pages (gratuit)
+1. Creez un depot GitHub et envoyez-y les fichiers.
+2. Settings > Pages > Branch main > Save.
+3. Ouvrez le lien https://votrenom.github.io/depot/ sur le telephone et installez.
+
+Apres la premiere ouverture, l'application fonctionne sans internet.
+Les donnees sont enregistrees sur le telephone (par navigateur/appareil).
